@@ -34,7 +34,7 @@ public class Gameplay : MonoBehaviour
             yield return new WaitForSeconds(1);
             duration--;
             textObject.text = duration.ToString();
-            if (duration == 0)
+            if (duration == 0 || (isPlayerReady && isEnemyReady))
             {
                 PlayerIsReady();
                 playerCloice = Choice.Paper;
@@ -66,5 +66,21 @@ public class Gameplay : MonoBehaviour
     {
         isPlayerReady = true;
         PlayerReadyToggle.isOn = true;
+    }
+
+    public void PlayerChoiceRock()
+    {
+        playerCloice = Choice.Rock;
+        PlayerIsReady();
+    }
+    public void PlayerChoicePaper()
+    {
+        playerCloice = Choice.Paper;
+        PlayerIsReady();
+    }
+    public void PlayerChoiceScissors()
+    {
+        playerCloice = Choice.Rock;
+        PlayerIsReady();
     }
 }
