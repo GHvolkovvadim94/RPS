@@ -8,42 +8,53 @@ public class BattleGameSystem : MonoBehaviour
     public BattleUISystem uiSystem;
 
     // Игровые переменные
-    private int playerHealth = 100;
-    private int enemyHealth = 100;
+    private int playerMaxHealth = 100;
+    private int playerCurrentHealth;
+    private int enemyMaxHealth = 100;
+    private int damageValue = 20;
+    private int enemyCurrentHealth;
     private Choice playerChoice = Choice.Empty;
     private Choice enemyChoice = Choice.Empty;
     private int currentRound = 1;
+    private float timerStartValue = 5f;
 
     private Coroutine enemyActionCoroutine;
 
     private void Start()
     {
+        playerCurrentHealth = playerMaxHealth;
+        enemyCurrentHealth = enemyMaxHealth;
+        uiSystem.UpdateHealthSlider(true, playerCurrentHealth, playerMaxHealth);
+        uiSystem.UpdateHealthSlider(false, enemyCurrentHealth, enemyMaxHealth);
+        uiSystem.timerText.text = timerStartValue.ToString();
         StartCoroutine(StartRound());
-        uiSystem.UpdateHealthSlider(true,playerHealth);
-        uiSystem.UpdateHealthSlider(false,enemyHealth);
     }
 
     private IEnumerator StartRound()
     {
         Debug.Log($"Round {currentRound} starts!");
 
-        // Отображаем текущий раунд
-        uiSystem.ShowRoundText(currentRound);
-        yield return new WaitForSeconds(2);
-        uiSystem.HideRoundText();
-
-        // Сбрасываем выборы и включаем кнопки для игрока
+        uiSystem.ResetActionButtons();
+        uiSystem.SetActionButtonsInteractable(false);
+        
         playerChoice = Choice.Empty;
         enemyChoice = Choice.Empty;
         uiSystem.SetPlayerActionToggle(false);
         uiSystem.SetEnemyActionToggle(false);
+
+
+        uiSystem.ShowRoundText(currentRound, uiSystem.FadeDuration);
+        yield return new WaitForSeconds(2);
+        uiSystem.HideRoundText(uiSystem.FadeDuration);
+        yield return new WaitForSeconds(uiSystem.FadeDuration);
         uiSystem.SetActionButtonsInteractable(true);
+
 
         // Запускаем корутину для врага
         enemyActionCoroutine = StartCoroutine(EnemyMakeChoice());
 
         // Запускаем таймер раунда
-        uiSystem.StartRoundTimer(10f, OnRoundTimerEnd);
+        uiSystem.StartRoundTimer(timerStartValue, OnRoundTimerEnd);
     }
 
     public void PlayerMakeChoice(Choice choice)
@@ -61,7 +72,7 @@ public class BattleGameSystem : MonoBehaviour
 
     private IEnumerator EnemyMakeChoice()
     {
-        yield return new WaitForSeconds(Random.Range(3f, 6f));
+        yield return new WaitForSeconds(Random.Range(1f, 3f));
         enemyChoice = (Choice)Random.Range(1, 4);
         uiSystem.SetEnemyActionToggle(true);
         Debug.Log($"Enemy chose {enemyChoice}");
@@ -73,7 +84,7 @@ public class BattleGameSystem : MonoBehaviour
     {
         if (playerChoice != Choice.Empty && enemyChoice != Choice.Empty)
         {
-            ResolveRound();
+            StartCoroutine(ResolveRound());
         }
     }
 
@@ -81,54 +92,64 @@ public class BattleGameSystem : MonoBehaviour
     {
         if (playerChoice == Choice.Empty)
         {
-            playerChoice = Choice.Empty;
-            uiSystem.SetPlayerActionToggle(true);
+            uiSystem.SetPlayerActionToggle(false);
         }
-
-        if (enemyChoice == Choice.Empty)
-        {
-            StopCoroutine(enemyActionCoroutine);
-            enemyChoice = (Choice)Random.Range(1, 4);
-            uiSystem.SetEnemyActionToggle(true);
-        }
-
-        ResolveRound();
+        StartCoroutine(ResolveRound());
     }
 
-    private void ResolveRound()
+    private IEnumerator ResolveRound()
     {
+        uiSystem.MarkRoundAsOver();
         Debug.Log("Resolving round...");
 
         if (playerChoice == enemyChoice)
         {
             Debug.Log("It's a draw!");
+            DealDamageToEnemy();
+            DealDamageToPlayer();
+
         }
         else if (
             (playerChoice == Choice.Rock && enemyChoice == Choice.Scissors) ||
             (playerChoice == Choice.Paper && enemyChoice == Choice.Rock) ||
             (playerChoice == Choice.Scissors && enemyChoice == Choice.Paper))
         {
+            DealDamageToEnemy();
             Debug.Log("Player wins the round!");
-            enemyHealth -= 10;
-            uiSystem.UpdateHealthSlider(false, enemyHealth);
-            uiSystem.ShowDamage(false, 10);
+
         }
         else
         {
+            DealDamageToPlayer();
             Debug.Log("Enemy wins the round!");
-            playerHealth -= 10;
-            uiSystem.UpdateHealthSlider(true, playerHealth);
-            uiSystem.ShowDamage(true, 10);
+
         }
+        yield return new WaitForSeconds(2);
 
         currentRound++;
-        if (playerHealth > 0 && enemyHealth > 0)
+        if (playerCurrentHealth > 0 && enemyCurrentHealth > 0)
         {
             StartCoroutine(StartRound());
         }
         else
         {
-            Debug.Log(playerHealth <= 0 ? "Enemy wins the game!" : "Player wins the game!");
+            Debug.Log(playerCurrentHealth <= 0 ? "Enemy wins the game!" : "Player wins the game!");
         }
+
+    }
+    private void DealDamageToPlayer()
+    {
+        playerCurrentHealth -= damageValue;
+        playerCurrentHealth = Mathf.Clamp(playerCurrentHealth, 0, playerMaxHealth); // Ограничиваем здоровье от 0 до максимума
+        uiSystem.UpdateHealthSlider(true, playerCurrentHealth, playerMaxHealth); // Указываем true для обновления здоровья игрока
+        uiSystem.ShowDamage(true, damageValue); // true для отображения урона для игрока
+    }
+
+    private void DealDamageToEnemy()
+    {
+        enemyCurrentHealth -= damageValue;
+        enemyCurrentHealth = Mathf.Clamp(enemyCurrentHealth, 0, enemyMaxHealth); // Ограничиваем здоровье от 0 до максимума
+        uiSystem.UpdateHealthSlider(false, enemyCurrentHealth, enemyMaxHealth); // false для обновления здоровья врага
+        uiSystem.ShowDamage(false, damageValue); // false для отображения урона для врага
     }
 }
