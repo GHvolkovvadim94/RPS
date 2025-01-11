@@ -11,7 +11,7 @@ public class BattleUISystem : MonoBehaviour
     public Button scissorsButton;
     public Slider playerHealthSlider;
     public Slider enemyHealthSlider;
-     public TextMeshProUGUI playerHealthText; 
+    public TextMeshProUGUI playerHealthText;
     public TextMeshProUGUI enemyHealthText;
     [SerializeField] private CanvasGroup roundCanvasGroup;
     public TextMeshProUGUI roundText;
@@ -19,28 +19,34 @@ public class BattleUISystem : MonoBehaviour
     public GameObject damagePopupPrefab;
     public Toggle playerActionToggle;
     public Toggle enemyActionToggle;
+    public TextMeshProUGUI playerNameText;
+
 
     private Coroutine timerCoroutine;
     private bool roundOver;
 
 
     public float FadeDuration { get; private set; } = 1f;
+    public float VisibleDuration { get; private set; } = 1f;
     private Button _selectedButton;
 
     private void Awake()
     {
-        // Подписываем кнопки на действия
         rockButton.onClick.AddListener(() => OnPlayerChoice(Choice.Rock, rockButton));
         paperButton.onClick.AddListener(() => OnPlayerChoice(Choice.Paper, paperButton));
         scissorsButton.onClick.AddListener(() => OnPlayerChoice(Choice.Scissors, scissorsButton));
+
+    }
+    private void Start()
+    {
+        roundCanvasGroup.gameObject.SetActive(false);
+
     }
 
     private void OnPlayerChoice(Choice choice, Button selectedButton)
     {
         _selectedButton = selectedButton;
         FindAnyObjectByType<BattleGameSystem>().PlayerMakeChoice(choice);
-
-        // Отключаем все кнопки, кроме выбранной
         SetActionButtonsInteractable(false, selectedButton);
     }
 
@@ -52,15 +58,14 @@ public class BattleUISystem : MonoBehaviour
         {
             if (button == selectedButton)
             {
-                // Делаем кнопку неактивной, но убираем затемнение
+
                 button.interactable = false;
                 var colors = button.colors;
-                colors.disabledColor = colors.normalColor; // Убираем затемнение
+                colors.disabledColor = colors.normalColor;
                 button.colors = colors;
             }
             else
             {
-                // Делаем остальные кнопки неактивными с затемнением
                 button.interactable = interactable;
             }
         }
@@ -73,14 +78,12 @@ public class BattleUISystem : MonoBehaviour
         foreach (var button in buttons)
         {
             button.interactable = true;
-
-            // Восстанавливаем затемнение
             var colors = button.colors;
             colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.5f);
             button.colors = colors;
         }
 
-        _selectedButton = null; // Сбрасываем выбранную кнопку
+        _selectedButton = null;
     }
 
     public void SetPlayerActionToggle(bool value)
@@ -161,7 +164,7 @@ public class BattleUISystem : MonoBehaviour
         if (timerCoroutine != null)
             StopCoroutine(timerCoroutine);
 
-        roundOver = false; // Сбрасываем флаг перед началом нового раунда
+        roundOver = false;
         timerCoroutine = StartCoroutine(RunRoundTimer(duration, onTimerEnd));
     }
     public void StopRoundTimer()
@@ -172,7 +175,7 @@ public class BattleUISystem : MonoBehaviour
             timerCoroutine = null;
         }
 
-        timerText.text = "0.0"; // Можно установить финальное значение таймера, если нужно
+        timerText.text = "0.0";
     }
 
     private IEnumerator RunRoundTimer(float duration, System.Action onTimerEnd)
@@ -181,9 +184,9 @@ public class BattleUISystem : MonoBehaviour
 
         while (remaining > 0)
         {
-            if (roundOver) // Проверяем, завершился ли раунд
+            if (roundOver)
             {
-                yield break; // Прерываем выполнение корутины
+                yield break;
             }
 
             timerText.text = remaining.ToString("F1");
@@ -197,46 +200,70 @@ public class BattleUISystem : MonoBehaviour
 
     public void MarkRoundAsOver()
     {
-        roundOver = true; // Устанавливаем флаг завершения раунда
-        StopRoundTimer(); // Останавливаем таймер
+        roundOver = true;
+        StopRoundTimer();
     }
 
-    public void ShowRoundText(int round, float duration)
+    public void ShowAndHideRoundText(int round, float fadeInDuration, float visibleDuration, float fadeOutDuration)
     {
         roundText.text = $"Round {round}";
-        StartCoroutine(FadeCanvasGroup(roundCanvasGroup, duration, true));
+        roundCanvasGroup.gameObject.SetActive(true);
+        StartCoroutine(FadeInAndOutCanvasGroup(roundCanvasGroup, fadeInDuration, visibleDuration, fadeOutDuration));
+    }
+    public void ShowAndHideRoundResultText(RoundResult roundResult, float fadeInDuration, float visibleDuration, float fadeOutDuration)
+    {
+        switch (roundResult)
+        {
+            case RoundResult.Draw:
+                roundText.text = $"It's a draw";
+                break;
+            case RoundResult.PlayerWin:
+                roundText.text = $"You won";
+                break;
+            case RoundResult.EnemyWin:
+                roundText.text = $"Enemy won";
+                break;
+
+
+        }
+        roundCanvasGroup.gameObject.SetActive(true);
+        StartCoroutine(FadeInAndOutCanvasGroup(roundCanvasGroup, fadeInDuration, visibleDuration, fadeOutDuration));
     }
 
-    public void HideRoundText(float duration)
+    private IEnumerator FadeInAndOutCanvasGroup(CanvasGroup canvasGroup, float fadeInDuration, float visibleDuration, float fadeOutDuration)
     {
-        StartCoroutine(FadeCanvasGroup(roundCanvasGroup, duration, false));
-    }
-
-    private IEnumerator FadeCanvasGroup(CanvasGroup canvasGroup, float duration, bool fadeIn)
-    {
+        // Fade in
         float elapsed = 0f;
+        float startAlpha = 0f;
+        float targetAlpha = 1f;
 
-        float startAlpha = canvasGroup.alpha;
-        float targetAlpha = fadeIn ? 1f : 0f;
-
-        while (elapsed < duration)
+        while (elapsed < fadeInDuration)
         {
             elapsed += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / duration);
+            canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeInDuration);
             yield return null;
         }
 
         canvasGroup.alpha = targetAlpha;
 
-        if (!fadeIn)
+        yield return new WaitForSeconds(visibleDuration);
+
+        // Fade out
+        elapsed = 0f;
+        startAlpha = 1f;
+        targetAlpha = 0f;
+        yield return new WaitForEndOfFrame();
+
+        while (elapsed < fadeOutDuration)
         {
-            canvasGroup.interactable = false;
-            canvasGroup.blocksRaycasts = false;
+            elapsed += Time.deltaTime;
+            canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / fadeOutDuration);
+            yield return null;
         }
-        else
-        {
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
-        }
+
+        canvasGroup.alpha = targetAlpha;
+
+        yield return new WaitForEndOfFrame();
+        canvasGroup.gameObject.SetActive(false);
     }
 }
