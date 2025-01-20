@@ -12,6 +12,7 @@ public class ApiRequests : MonoBehaviour
     public delegate void UserUpdatedHandler();
     public event UserUpdatedHandler OnUserUpdated;
 
+
     private void Awake()
     {
         if (Instance == null)
@@ -22,6 +23,27 @@ public class ApiRequests : MonoBehaviour
         else
         {
             Destroy(gameObject);
+        }
+    }
+
+    public IEnumerator ServerStatus()
+    {
+        string url = "http://localhost:5500/serverstatus/health";
+
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                Debug.Log("Server is available");
+                GameInitialization.Instance.ValidataUserId();
+            }
+            else
+            {
+                Debug.LogError("Server is not available: " + request.error);
+                UIManager.Instance.ShowErrorScreen("Server is not available. Please try again later.");
+            }
         }
     }
 
@@ -159,7 +181,120 @@ public class ApiRequests : MonoBehaviour
             return RoundResult.Draw;
         }
     }
+
+
+    public IEnumerator JoinQueue()
+    {
+        string url = "http://localhost:5500/queue/join";
+        string userId = PlayerPrefs.GetString("UserId");
+
+        WWWForm form = new WWWForm();
+        form.AddField("userId", userId);
+
+        using (UnityWebRequest request = UnityWebRequest.Post(url, form))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                UIManager.Instance.ShowQueueScreen();
+            }
+            else
+            {
+                UIManager.Instance.ShowErrorScreen("Failed to join queue: " + request.error);
+            }
+        }
+    }
+
+
+    public IEnumerator LeaveQueue()
+    {
+        string url = "http://localhost:5500/queue/leave";
+        string userId = PlayerPrefs.GetString("UserId");
+
+        WWWForm form = new WWWForm();
+        form.AddField("userId", userId);
+
+        using (UnityWebRequest request = UnityWebRequest.Post(url, form))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                UIManager.Instance.ShowLobbyScreen();
+            }
+            else
+            {
+                UIManager.Instance.ShowErrorScreen("Failed to leave queue: " + request.error);
+            }
+        }
+    }
+    public IEnumerator CheckQueue(System.Action<bool, string> callback)
+    {
+        string url = "http://localhost:5500/match/create";
+        string userId = PlayerPrefs.GetString("UserId");
+
+        WWWForm form = new WWWForm();
+        form.AddField("userId", userId);
+
+        using (UnityWebRequest request = UnityWebRequest.Post(url, form))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                var response = JsonUtility.FromJson<MatchResponse>(request.downloadHandler.text);
+                callback(true, response.opponentId);
+            }
+            else
+            {
+                callback(false, null);
+            }
+        }
+    }
+
+    public IEnumerator GetUserProfile()
+    {
+        string userId = PlayerPrefs.GetString("UserId");
+        string url = $"http://localhost:5500/user/stats/{userId}";
+
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                var response = JsonUtility.FromJson<UserProfileResponse>(request.downloadHandler.text);
+                UIManager.Instance.UpdateQueueUserProfile(response.userName, response.matches, response.wins);
+            }
+            else
+            {
+                UIManager.Instance.ShowErrorScreen("Failed to get user profile: " + request.error);
+            }
+        }
+    }
+
+    public IEnumerator GetOpponentData(string opponentId)
+    {
+        string url = $"http://localhost:5500/user/stats/{opponentId}";
+
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                var response = JsonUtility.FromJson<UserProfileResponse>(request.downloadHandler.text);
+                UIManager.Instance.UpdateOpponentProfile(response.userName, response.matches, response.wins);
+            }
+            else
+            {
+                UIManager.Instance.ShowErrorScreen("Failed to get opponent data: " + request.error);
+            }
+        }
+    }
 }
+
 
 [System.Serializable]
 public class RegisterResponse
@@ -171,4 +306,19 @@ public class RegisterResponse
 public class UserNameResponse
 {
     public string name;
+}
+
+[System.Serializable]
+public class MatchResponse
+{
+    public string opponentId;
+}
+
+[System.Serializable]
+public class UserProfileResponse
+{
+    public string userId;
+    public string userName;
+    public int matches;
+    public int wins;
 }

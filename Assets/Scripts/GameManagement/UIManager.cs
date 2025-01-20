@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Text.RegularExpressions;
+using System.Collections;
 
 public class UIManager : MonoBehaviour
 {
@@ -19,6 +20,8 @@ public class UIManager : MonoBehaviour
     public Button nameChangeCloseButton;
 
     [Header("Lobby Screen Elements")]
+    public Button startButton;
+    public TextMeshProUGUI userStatsText;
     public TextMeshProUGUI userNameText;
     public Button changeNameButton;
 
@@ -28,6 +31,17 @@ public class UIManager : MonoBehaviour
     [Header("Loading Screen Elements")]
     public Slider loadingSlider;
     public Button continueButton;
+
+    [Header("Queue Screen Elements")]
+    public Button cancelButton;
+    public TextMeshProUGUI queueUserNameText;
+    public TextMeshProUGUI queueUserStatsText;
+    public TextMeshProUGUI opponentNameText;
+    public TextMeshProUGUI opponentStatsText;
+    public TextMeshProUGUI countdownText;
+
+    [Header("Error Screen Elements")]
+    public TextMeshProUGUI errorScreenText;
 
     public ApiRequests apiRequests;
 
@@ -52,6 +66,8 @@ public class UIManager : MonoBehaviour
         changeNameButton.onClick.AddListener(OnChangeNameButtonClick);
         apiRequests.OnUserRegistered += OnUserRegistered;
         apiRequests.OnUserUpdated += OnUserUpdated;
+        startButton.onClick.AddListener(OnStartButtonClick);
+        cancelButton.onClick.AddListener(OnCancelButtonClick);
 
         // Обновляем текст UserId при старте
         UpdateUserIdText();
@@ -65,6 +81,8 @@ public class UIManager : MonoBehaviour
         changeNameButton.onClick.RemoveListener(OnChangeNameButtonClick);
         apiRequests.OnUserRegistered -= OnUserRegistered;
         apiRequests.OnUserUpdated -= OnUserUpdated;
+        startButton.onClick.RemoveListener(OnStartButtonClick);
+        cancelButton.onClick.RemoveListener(OnCancelButtonClick);
     }
 
     private void OnConfirmButtonClick()
@@ -97,6 +115,8 @@ public class UIManager : MonoBehaviour
         }
     }
 
+
+
     private void OnNameChangeCloseButtonClick()
     {
         ScreenManager.Instance.ShowScreen(ScreenManager.Instance.lobbyScreen);
@@ -119,6 +139,25 @@ public class UIManager : MonoBehaviour
     {
         StartCoroutine(apiRequests.GetUserName(PlayerPrefs.GetString("UserId")));
         ScreenManager.Instance.ShowScreen(ScreenManager.Instance.lobbyScreen);
+    }
+
+
+    private void OnStartButtonClick()
+    {
+        StartCoroutine(apiRequests.JoinQueue());
+        StartCoroutine(apiRequests.GetUserProfile());
+
+    }
+
+    private void OnCancelButtonClick()
+    {
+        StartCoroutine(apiRequests.LeaveQueue());
+    }
+
+    public void ShowErrorScreen(string message)
+    {
+        errorScreenText.text = message;
+        ScreenManager.Instance.ShowScreen(ScreenManager.Instance.errorScreen);
     }
 
     public void ShowError(string message, bool isNameChange = false)
@@ -160,12 +199,6 @@ public class UIManager : MonoBehaviour
         {
             ScreenManager.Instance.ShowScreen(ScreenManager.Instance.drawScreen);
         }
-    }
-
-    public void ShowErrorScreen(string message)
-    {
-        errorText.text = message;
-        ScreenManager.Instance.ShowScreen(ScreenManager.Instance.errorScreen);
     }
 
     public void ShowLobbyScreen()
@@ -219,5 +252,67 @@ public class UIManager : MonoBehaviour
         errorText.gameObject.SetActive(false);
         nameChangeErrorText.text = "";
         nameChangeErrorText.gameObject.SetActive(false);
+    }
+
+
+
+    public void ShowQueueScreen()
+    {
+        ScreenManager.Instance.ShowScreen(ScreenManager.Instance.queueScreen);
+        StartCoroutine(QueueProcess());
+    }
+
+    private IEnumerator QueueProcess()
+    {
+        yield return new WaitForSeconds(2);
+
+        while (true)
+        {
+            yield return new WaitForSeconds(3);
+
+            bool matchCreated = false;
+            string opponentId = null;
+            yield return StartCoroutine(apiRequests.CheckQueue((result, opponent) =>
+            {
+                matchCreated = result;
+                opponentId = opponent;
+            }));
+
+            if (matchCreated && opponentId != null)
+            {
+                yield return StartCoroutine(apiRequests.GetOpponentData(opponentId));
+                yield return StartCoroutine(Countdown());
+                ScreenManager.Instance.ShowScreen(ScreenManager.Instance.battleScreen);
+                break;
+            }
+        }
+    }
+
+    private IEnumerator Countdown()
+    {
+        for (int i = 3; i >= 0; i--)
+        {
+            countdownText.text = $"Match starts in {i}...";
+            yield return new WaitForSeconds(1);
+        }
+    }
+
+
+    public void UpdateUserProfile(string userName, int matches, int wins)
+    {
+        userNameText.text = userName;
+        userStatsText.text = $"Matches: {matches} / Wins: {wins}";
+    }
+
+    public void UpdateQueueUserProfile(string userName, int matches, int wins)
+    {
+        queueUserNameText.text = userName;
+        queueUserStatsText.text = $"Matches: {matches} / Wins: {wins}";
+    }
+
+    public void UpdateOpponentProfile(string opponentName, int matches, int wins)
+    {
+        opponentNameText.text = opponentName;
+        opponentStatsText.text = $"Matches: {matches} / Wins: {wins}";
     }
 }

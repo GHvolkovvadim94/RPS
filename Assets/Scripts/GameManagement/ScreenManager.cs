@@ -29,11 +29,12 @@ public class ScreenManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
+        HideAllScreens();
+
     }
 
     private void Start()
     {
-        HideAllScreens();
     }
 
     public void ShowScreen(GameObject screen)
